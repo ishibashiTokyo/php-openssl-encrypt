@@ -106,9 +106,10 @@ if(isset($_POST['code'])) {
 </head>
 <body>
     <form method="post">
-        <textarea name="code" rows="10" cols="50"><?php echo $code; ?></textarea>
+        <textarea name="code" rows="10" cols="50"><?php echo $code; ?></textarea><br>
         <input type="submit" value="Submit">
     </form>
+    <h2>Result:</h2>
     <pre><?php echo $decrypted; ?></pre>
 </body>
 </html>

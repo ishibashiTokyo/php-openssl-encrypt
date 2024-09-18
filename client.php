@@ -53,7 +53,6 @@ tzLasuFwZhlChCfrX68w5swc+5O71SXRWIrc/ERT600wS4OgRx7AYe44cl7wZBhQ
 lOi4NF+DI13+8eZXc42fU1CTrnKXGfe5C3LROSSneDg8xuBW7jhrqS/u6VQ59DxV
 VXZBGZ5xag1vBwr1q6TotGo8z6TkX7g=
 -----END PRIVATE KEY-----';
-
 $server_pub = '-----BEGIN PUBLIC KEY-----
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAuQpCRFkMWAz6EZrpICc3
 +MhOgv/TTnUeHhUWPDqG3eRNnqgxBWOI7wvj+T8d54BpfjLQ/oDIaExPoh5I5rCl
@@ -73,9 +72,7 @@ if(!isset($_POST[POST_KEY])) {
     die('Invalid request');
 }
 
-
 $encryptedData = base64_decode($_POST[POST_KEY]);
-
 $priKey = openssl_pkey_get_private($client_key);
 
 if (!$priKey) {
