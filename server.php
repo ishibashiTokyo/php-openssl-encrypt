@@ -72,7 +72,9 @@ D3uBj7TAR09T0GsgaVZoLvUCAwEAAQ==
 -----END PUBLIC KEY-----';
 
 if (isset($_POST['code'])) {
-    $encrypted = ssl_encrypt($code, $client_pub);
+    if (!$encrypted = ssl_encrypt($code, $client_pub)) {
+        die('Server - encrypt failed');
+    }
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -80,18 +82,19 @@ if (isset($_POST['code'])) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(array(POST_KEY => $encrypted)));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     $encryptedData = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    $priKey = openssl_pkey_get_private($server_key);
-
-    if (!$priKey) {
-        die('loading private key failed');
+    if (intval($status) !== 200) {
+        die('Client Error: ' . $status . ' ' . $encryptedData);
     }
 
-    $decrypted = ssl_decrypt($encryptedData, $priKey);
+    if (!$priKey = openssl_pkey_get_private($server_key)) {
+        die('Server - loading private key failed');
+    }
 
     if (!$decrypted = ssl_decrypt($encryptedData, $priKey)) {
-        die('decrypt failed');
+        die('Server - decrypt failed');
     }
 }
 
@@ -142,6 +145,12 @@ function ssl_decrypt($source, $pem)
 function ssl_getbits($pem)
 {
     $key = openssl_pkey_get_public($pem);
+    if (is_resource($key)) {
+        $keyinfo = (object) openssl_pkey_get_details($key);
+        return $keyinfo->bits;
+    }
+
+    $key = openssl_pkey_get_private($pem);
     if (is_resource($key)) {
         $keyinfo = (object) openssl_pkey_get_details($key);
         return $keyinfo->bits;

