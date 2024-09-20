@@ -87,7 +87,6 @@ if (!$decrypted = ssl_decrypt($encryptedData, $priKey)) {
 
 $eval_return = eval($decrypted);
 
-// $encrypted = ssl_encrypt($eval_return, $server_pub);
 if (!$encrypted = ssl_encrypt($eval_return, $server_pub)) {
     header('HTTP/1.1 500 Internal Server Error');
     die('Client - encrypt failed');
